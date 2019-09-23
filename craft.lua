@@ -42,7 +42,7 @@ simplecrafting_lib.craft_stack = function(crafting_type, request_stack, source_i
 			
 			if player then
 				leftover = simplecrafting_lib.add_items(player:get_inventory(), "main", leftover)
-				simplecrafting_lib.drop_items(player:getpos(), leftover)
+				simplecrafting_lib.drop_items(player:get_pos(), leftover)
 			elseif pos then
 				simplecrafting_lib.drop_items(pos, leftover)
 			else
