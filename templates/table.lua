@@ -51,17 +51,17 @@ local function make_formspec(pos, meta, inv)
 		"listring[nodemeta:"..pos_string..";input]",
 		"listring[current_player;main]",
 	}
-	
+
 	if table_def.description then
 		inventory[#inventory+1] = "label[0,0;"..table_def.description.."]"
 	end
-	
+
 	if modpath_default then
 		inventory[#inventory+1] = default.gui_bg
 		inventory[#inventory+1] = default.gui_bg_img
 		inventory[#inventory+1] = default.gui_slots
 	end
-	
+
 	local pages = false
 	local page_button_y = "7.3"
 	if item_count > ((row/output_height)+1) * output_count then
@@ -78,17 +78,17 @@ local function make_formspec(pos, meta, inv)
 	if pages then
 		inventory[#inventory+1] = "label[9.3,6.5;" .. S("Page @1", tostring(row/output_height+1)) .. "]"
 	end
-	
+
 	if max_mode then
 		inventory[#inventory+1] = "button[9.3,8.7;1,0.75;max_mode;"..S("Max\nOutput").."]"
 	else
 		inventory[#inventory+1] = "button[9.3,8.7;1,0.75;max_mode;"..S("Min\nOutput").."]"
 	end
-	
+
 	if table_def.show_guides then
 		inventory[#inventory+1] = "button[9.3,9.7;1,0.75;show_guide;"..S("Show\nGuide").."]"
 	end
-	
+
 	if table_def.append_to_formspec then
 		inventory[#inventory+1] = table_def.append_to_formspec
 	end
@@ -106,7 +106,7 @@ local function refresh_inv(pos, meta)
 	local inv = meta:get_inventory()
 	local max_mode = meta:get_string("max_mode")
 	refresh_output(inv, max_mode == "True")
-	
+
 	local row = meta:get_int("row")
 	local item_count = inv:get_size("output")
 	if item_count < output_count then
@@ -123,7 +123,7 @@ local on_construct = function(pos)
 	inv:set_size("output", output_count)
 	meta:set_int("row", 0)
 end
-	
+
 local allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, number, player)
 	if to_list == "output" then
 		return 0
@@ -185,14 +185,21 @@ if table_def.enable_pipeworks and minetest.get_modpath("pipeworks") then
 end
 
 local function allow_metadata_inventory_take(pos, listname, index, stack, player)
+	local meta = minetest.get_meta(pos)
+	local inv = meta:get_inventory()
+	local input_stack = inv:get_stack(listname,  index)
+	local player_inv = player:get_inventory()
 	if table_def.protect_inventory and
 		minetest.is_protected(pos, player:get_player_name())
 		and not minetest.check_player_privs(player:get_name(), "protection_bypass") then
 		return 0
 	end
+	if not player_inv:room_for_item('main', input_stack) then
+		return 0
+	end
 	return stack:get_count()
 end
-	
+
 local on_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, number, player)
 	local meta = minetest.get_meta(pos)
 	if from_list == "output" and to_list == "input" then
@@ -206,19 +213,26 @@ local on_metadata_inventory_move = function(pos, from_list, from_index, to_list,
 	end
 	refresh_inv(pos, meta)
 end
-	
+
 local on_metadata_inventory_take = function(pos, list_name, index, stack, player)
 	local meta = minetest.get_meta(pos)
 	if list_name == "output" then
 		local inv = meta:get_inventory()
+		local input_stack = inv:get_stack(list_name, index)
+		if not input_stack:is_empty() and input_stack:get_name()~=stack:get_name() then
+			local player_inv = player:get_inventory()
+			if player_inv:room_for_item("main", input_stack) then
+				player_inv:add_item("main", input_stack)
+			end
+		end
 		simplecrafting_lib.craft_stack(craft_type, stack, inv, "input", player:get_inventory(), "main", player)
 		if modpath_awards then
-			awards.increment_item_counter(awards.players[player:get_player_name()], "craft", ItemStack(stack):get_name(), ItemStack(stack):get_count()) 
+			awards.increment_item_counter(awards.players[player:get_player_name()], "craft", ItemStack(stack):get_name(), ItemStack(stack):get_count())
 		end
 	end
 	refresh_inv(pos, meta)
 end
-	
+
 local on_metadata_inventory_put = function(pos, list_name, index, stack, player)
 	local meta = minetest.get_meta(pos)
 	refresh_inv(pos, meta)
@@ -231,7 +245,7 @@ local on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
 		"simplecrafting_lib:table_"..craft_type..minetest.pos_to_string(pos),
 		make_formspec(pos, meta, inv))
 end
-	
+
 local can_dig = function(pos, player)
 	local meta = minetest.get_meta(pos)
 	local inv = meta:get_inventory()
@@ -246,7 +260,7 @@ minetest.register_on_player_receive_fields(function(sender, formname, fields)
 
 	local pos = minetest.string_to_pos(string.sub(formname, prefix_length+1))
 	if pos == nil then return false end
-	
+
 	local meta = minetest.get_meta(pos)
 	local inv = meta:get_inventory()
 	local size = inv:get_size("output")
@@ -282,7 +296,7 @@ minetest.register_on_player_receive_fields(function(sender, formname, fields)
 	elseif fields.quit then
 		return true
 	end
-	
+
 	minetest.show_formspec(sender:get_player_name(), formname, make_formspec(pos, meta, inv))
 	return true
 end)
